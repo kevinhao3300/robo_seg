@@ -35,7 +35,7 @@ if __name__ == "__main__":
 	m = np.load('traj_data.npy',allow_pickle='TRUE', encoding='bytes').item()
 	for i,d in enumerate(m[b'cube_data/AB']):	
 		print(i)
-		# play_traj(d,'AB' + '_' + str(i) + '.mp4')
+		play_traj(d,'AB' + '_' + str(i) + '.mp4')
 	# for k in m:
 	# 	print(k, len(m[k]), m[k][0].shape)
 
