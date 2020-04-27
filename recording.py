@@ -38,6 +38,7 @@ if __name__ == "__main__":
     dof = env.dof
 
     # create a video writer with imageio
+    print(type(args.video_path),args.video_path)
     writer = imageio.get_writer(args.video_path, fps=20)
 
     frames = []
