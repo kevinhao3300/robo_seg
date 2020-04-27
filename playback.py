@@ -71,7 +71,6 @@ if __name__ == "__main__":
 
         # load the flattened mujoco states
         states = f["data/{}/states".format(ep)].value
-
         if args.use_actions:
 
             # load the initial state
@@ -80,6 +79,7 @@ if __name__ == "__main__":
 
             # load the actions and play them back open-loop
             jvels = f["data/{}/joint_velocities".format(ep)].value
+            print("jvels", jvels)
             grip_acts = f["data/{}/gripper_actuations".format(ep)].value
             actions = np.concatenate([jvels, grip_acts], axis=1)
             num_actions = actions.shape[0]
@@ -97,6 +97,7 @@ if __name__ == "__main__":
 
             # force the sequence of internal mujoco states one by one
             for state in states:
+                print("state", state)
                 env.sim.set_state_from_flattened(state)
                 env.sim.forward()
                 env.render()
