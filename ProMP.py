@@ -67,8 +67,7 @@ def make_ProMP (grouped_traj):
     mean_traj, cov_traj = get_traj_distribution(mean_w, cov_w)
     return (mean_traj, cov_traj)
 
-def sample (attr):
-    mean_traj, cov_traj = attr
+def sample (mean_traj, cov_traj):
     s = np.random.multivariate_normal(mean_traj, cov_traj, 1).T
     return stack(s)
 

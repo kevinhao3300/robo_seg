@@ -31,16 +31,12 @@ def play_traj(traj):
 		env.render()
 
 if __name__ == "__main__":
-	grouped_traj_map = np.load('only_train.npy',allow_pickle='TRUE').item()
-	promp_map = {}
-	for k,v in grouped_traj_map.items():
-		if k != 'cube_data/HD':
-			promp_map[k] = make_ProMP(v)
-	# for promp in promp_map.values():
-	# 	s = sample(promp)
-	# 	play_traj(s)
-
-
-	np.save('promp_map',promp_map)
+	promp_map = np.load('promp_map.npy',allow_pickle='TRUE').item()
+	# how to generate sample trajectory
+	# this goes through and samples a single trajectory for each type of demonstration
+	for k,v in promp_map.items():
+		play_traj(sample(*v))
+	# start with 100
+	# data loading 
 
 
