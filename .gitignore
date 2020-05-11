@@ -1,1 +1,4 @@
 promp_map.npy
+only_train.npy
+traj_data.npy
+AGH_map.npy

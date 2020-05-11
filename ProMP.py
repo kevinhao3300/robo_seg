@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 B = 10
 c = np.linspace(0.0, 1.0, B)
@@ -15,16 +16,19 @@ def radial_basis(phase,centers,bandwidth):
 
 #data needs to be dimensions x time stamps
 def learn_weights(data, phi, lamda=1e-6):
-    w = np.linalg.solve(np.dot(phi.T,phi)+lamda*np.eye(B),np.dot(phi.T,data[0:,:].T)).T
+    w = np.linalg.solve(np.dot(phi.T,phi)+lamda*np.eye(B),np.dot(phi.T,data.T)).T
     return w
 
 def get_phase(t):
-    phase = t-np.min(t)
-    phase /= np.max(phase)
-    return phase
+    if isinstance(t, (list, tuple, set, np.ndarray)):
+        phase = t-np.min(t)
+        phase /= np.max(phase)
+        return phase
+    else:
+        return np.linspace(0,1,t)
 
 def learn_weight_distribution(trajectories):
-    ws = np.array([learn_weights(d,radial_basis(get_phase(d[0,:]),c,h)).flatten() for d in trajectories])
+    ws = np.array([learn_weights(d,radial_basis(get_phase(d.shape[1]),c,h)).flatten() for d in trajectories])
     mu = np.mean(ws,axis=0)
     sigma = np.cov(ws.T)
     return mu, sigma
@@ -57,9 +61,7 @@ def conditioning(sigma_w, sigma_y, t, mu_w, y_t):
 # takes in flattened version (all dimensions in 1D array), returns stacked based on 7 dimensions
 def stack(mean_traj):
     stacked_mean_traj = [[],[],[],[],[],[],[]]
-    for i in range(7):
-        stacked_mean_traj[i] = mean_traj[i * mean_traj.shape[0] // 7: (i+1) * mean_traj.shape[0] // 7]
-    return np.reshape(stacked_mean_traj, (7,mean_traj.shape[0] // 7))
+    return mean_traj.reshape(7,-1)
 
 # takes in group of trajectories and returns a promp
 def make_ProMP (grouped_traj):
@@ -68,8 +70,9 @@ def make_ProMP (grouped_traj):
     return (mean_traj, cov_traj)
 
 def sample (mean_traj, cov_traj):
-    s = np.random.multivariate_normal(mean_traj, cov_traj, 1).T
-    return stack(s)
+    return stack(mean_traj)
+    # s = np.random.multivariate_normal(mean_traj, cov_traj, 1).T
+    # return stack(s)
 
 
 
