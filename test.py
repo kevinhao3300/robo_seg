@@ -75,7 +75,9 @@ if __name__ == "__main__":
 
 
 	AGH_map = np.load('AGH_map.npy',allow_pickle='TRUE').item()
-	env = suite.make("SawyerLift", has_renderer=True)
-	generate(AGH_map, 10000, 'large', env)
+	for k,v in AGH_map.items():
+		play_traj(sample(*v))
+	# env = suite.make("SawyerLift", has_renderer=True)
+	# generate(AGH_map, 10000, 'large', env)
 
 	

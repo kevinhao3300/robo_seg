@@ -69,3 +69,5 @@ class PINN(nn.Module):
 	def init_hidden(self):
 		#Hidden parameters: # of layers, batch size, size of hidden dimension
 		return (torch.zeros(LSTM_layers, batch_size, hidden_dim), torch.zeros(LSTM_layers, batch_size, hidden_dim))
+
+		
