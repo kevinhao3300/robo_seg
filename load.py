@@ -10,6 +10,9 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from torch.utils.data import Dataset, DataLoader
+import time
+from sklearn.metrics import accuracy_score
+
 
 classes = ['AG','AH','GA','GH','HA','HG']
 
@@ -26,9 +29,9 @@ class CNN(nn.Module):
 		drop_p = 0.3
 		self.img_x = 256
 		self.img_y = 256
-		self.CNN_embed_dim = 300
+		self.CNN_embed_dim = 30
 
-		self.ch1, self.ch2, self.ch3, self.ch4 = 32, 64, 128, 256
+		self.ch1, self.ch2, self.ch3, self.ch4 = 8, 16, 32, 64
 		self.k1, self.k2, self.k3, self.k4 = (5, 5), (3, 3), (3, 3), (3, 3)      # 2d kernal size
 		self.s1, self.s2, self.s3, self.s4 = (2, 2), (2, 2), (2, 2), (2, 2)      # 2d strides
 		self.pd1, self.pd2, self.pd3, self.pd4 = (0, 0), (0, 0), (0, 0), (0, 0)  # 2d padding
@@ -37,7 +40,7 @@ class CNN(nn.Module):
 		self.conv2_outshape = conv2D_output_size(self.conv1_outshape, self.pd2, self.k2, self.s2)
 		self.conv3_outshape = conv2D_output_size(self.conv2_outshape, self.pd3, self.k3, self.s3)
 		self.conv4_outshape = conv2D_output_size(self.conv3_outshape, self.pd4, self.k4, self.s4)
-		self.fc_hidden1, self.fc_hidden2 = 512, 512
+		self.fc_hidden1, self.fc_hidden2 = 128, 128
 		self.drop_p = drop_p
 
 		self.conv1 = nn.Sequential(
@@ -97,6 +100,43 @@ class CNN(nn.Module):
 
 		return cnn_embed_seq
 
+class RNN(nn.Module):
+    def __init__(self):
+        super(RNN, self).__init__()
+
+        self.RNN_input_size = 30
+        self.h_RNN_layers = 3   # RNN hidden layers
+        self.h_RNN = 64                 # RNN hidden nodes
+        self.h_FC_dim = 32
+        self.drop_p = 0.3
+        self.num_classes = 6
+
+        self.LSTM = nn.LSTM(
+            input_size=self.RNN_input_size,
+            hidden_size=self.h_RNN,        
+            num_layers=self.h_RNN_layers,       
+            batch_first=True,       # input & output will has batch size as 1s dimension. e.g. (batch, time_step, input_size)
+        )
+
+        self.fc1 = nn.Linear(self.h_RNN, self.h_FC_dim)
+        self.fc2 = nn.Linear(self.h_FC_dim, self.num_classes)
+
+    def forward(self, x_RNN):
+        
+        self.LSTM.flatten_parameters()
+        RNN_out, (h_n, h_c) = self.LSTM(x_RNN, None)  
+        """ h_n shape (n_layers, batch, hidden_size), h_c shape (n_layers, batch, hidden_size) """ 
+        """ None represents zero initial hidden state. RNN_out has shape=(batch, time_step, output_size) """
+
+        # FC layers
+        x = self.fc1(RNN_out[:, -1, :])   # choose RNN_out at the last time step
+        x = F.relu(x)
+        x = F.dropout(x, p=self.drop_p, training=self.training)
+        x = self.fc2(x)
+
+        return x
+
+
 class AGH_Dataset(Dataset):
 	def __init__(self, dir_name):
 		self.dir = dir_name
@@ -120,44 +160,49 @@ class AGH_Dataset(Dataset):
 	def __getitem__ (self, idx):
 		folder = self.folders[idx]
 		X = self.read_images(folder)
-		y = torch.LongTensor([classes.index(folder[:2])])
+		y = classes.index(folder[:2])
 
 		return X,y
 
+def train(cnn, lstm, train_loader, optimizer, criterion, epoch):
+	cnn.train()
+	lstm.train()
+	losses = []
+	scores = []
+	for batch_idx, (X, y) in enumerate(trainloader):
+		optimizer.zero_grad()
+		output = lstm(cnn((X)))
+		loss = criterion(output,y)
+		losses.append(loss.item())
+
+		y_pred = torch.max(output,1)[1]
+		step_score = accuracy_score(y.cpu().data.squeeze().numpy(), y_pred.cpu().data.squeeze().numpy())
+		scores.append(step_score)
+		loss.backward()
+		optimizer.step()
+
+	return losses, scores
+
 if __name__ == '__main__':
-	num_epochs = 2
+	print('starting')
+	start = time.time()
+	num_epochs = 10
 	trainset = AGH_Dataset('data/smalljpg')
 	trainloader = torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
-	model = CNN()
-	with torch.no_grad():
-		for batch_idx, (X, y) in enumerate(trainloader):
-			out = model(X)
+	cnn = CNN()
+	lstm = RNN()
 
-	# net = CNN()
-	# criterion = nn.CrossEntropyLoss()
-	# optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-	# for epoch in range(num_epochs):  
+	crnn_params = list(cnn.parameters()) + list(lstm.parameters())
+	optimizer = torch.optim.Adam(crnn_params, lr=1e-4)
+	criterion = nn.CrossEntropyLoss()
+	# epoch_train_losses = []
+	# epoch_train_scores = []
+	# epoch_test_losses = []
+	# epoch_test_scores = []
+	for epoch in range(num_epochs):
+		train_losses, train_scores = train(cnn, lstm, trainloader, optimizer, criterion, epoch)
+		print(epoch, train_losses, train_scores)
 
-	#     running_loss = 0.0
-	#     for i, data in enumerate(trainloader, 0):
-	#         # get the inputs; data is a list of [inputs, labels]
-	#         inputs, labels = data
-
-	#         # zero the parameter gradients
-	#         optimizer.zero_grad()
-
-	#         # forward + backward + optimize
-	#         outputs = net(inputs)
-	#         loss = criterion(outputs, labels)
-	#         loss.backward()
-	#         optimizer.step()
-
-	#         # print statistics
-	#         running_loss += loss.item()
-	#         if i % 2000 == 1999:    # print every 2000 mini-batches
-	#             print('[%d, %5d] loss: %.3f' %
-	#                   (epoch + 1, i + 1, running_loss / 2000))
-	#             running_loss = 0.0
-
-	# print('Finished Training')
+	print(f'done training after {time.time() - start} seconds')
+	
 
