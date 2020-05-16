@@ -2,7 +2,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 import os
-import imageio
+from PIL import Image
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -37,7 +37,6 @@ class CNN(nn.Module):
 		self.conv2_outshape = conv2D_output_size(self.conv1_outshape, self.pd2, self.k2, self.s2)
 		self.conv3_outshape = conv2D_output_size(self.conv2_outshape, self.pd3, self.k3, self.s3)
 		self.conv4_outshape = conv2D_output_size(self.conv3_outshape, self.pd4, self.k4, self.s4)
-
 		self.fc_hidden1, self.fc_hidden2 = 512, 512
 		self.drop_p = drop_p
 
@@ -45,27 +44,27 @@ class CNN(nn.Module):
 			nn.Conv2d(in_channels=3, out_channels=self.ch1, kernel_size=self.k1, stride=self.s1, padding=self.pd1),
 			nn.BatchNorm2d(self.ch1, momentum=0.01),
 			nn.ReLU(inplace=True),                      
-			nn.MaxPool2d(kernel_size=2)
+			# nn.MaxPool2d(kernel_size=2)
 		)
 		self.conv2 = nn.Sequential(
 			nn.Conv2d(in_channels=self.ch1, out_channels=self.ch2, kernel_size=self.k2, stride=self.s2, padding=self.pd2),
 			nn.BatchNorm2d(self.ch2, momentum=0.01),
 			nn.ReLU(inplace=True),
-			nn.MaxPool2d(kernel_size=2)
+			# nn.MaxPool2d(kernel_size=2)
 		)
 
 		self.conv3 = nn.Sequential(
 			nn.Conv2d(in_channels=self.ch2, out_channels=self.ch3, kernel_size=self.k3, stride=self.s3, padding=self.pd3),
 			nn.BatchNorm2d(self.ch3, momentum=0.01),
 			nn.ReLU(inplace=True),
-			nn.MaxPool2d(kernel_size=2)
+			# nn.MaxPool2d(kernel_size=2)
 		)
 
 		self.conv4 = nn.Sequential(
 			nn.Conv2d(in_channels=self.ch3, out_channels=self.ch4, kernel_size=self.k4, stride=self.s4, padding=self.pd4),
 			nn.BatchNorm2d(self.ch4, momentum=0.01),
 			nn.ReLU(inplace=True),
-			nn.MaxPool2d(kernel_size=2)
+			# nn.MaxPool2d(kernel_size=2)
 		)
 
 		self.drop = nn.Dropout2d(self.drop_p)
@@ -79,13 +78,9 @@ class CNN(nn.Module):
 		for t in range(x_3d.size(1)):
 		    # CNNs
 		    x = self.conv1(x_3d[:, t, :, :, :])
-		    print('one')
 		    x = self.conv2(x)
-		    print('two')
 		    x = self.conv3(x)
-		    print('three')
 		    x = self.conv4(x)
-		    print('four')
 		    x = x.view(x.size(0), -1)           # flatten the output of conv
 
 		    # FC layers
@@ -105,53 +100,37 @@ class CNN(nn.Module):
 class AGH_Dataset(Dataset):
 	def __init__(self, dir_name):
 		self.dir = dir_name
-		self.files = os.listdir(dir_name)
+		self.folders = [folder for folder in os.listdir(dir_name) if folder[0].isalpha()]
 
 	def __len__(self):
-		return len(self.files)
+		return len(self.folders)
+
+	def read_images(self, folder):
+		X = []
+		for i in range(100):
+			im = Image.open(self.dir + '/' + folder + '/' + str(i) + '.jpg')
+			transform = transforms.Compose([transforms.Resize([256, 256]),
+                                transforms.ToTensor(),
+                                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+			im = transform(im)
+			X.append(im)
+		X = torch.stack(X, dim=0)
+		return X
 
 	def __getitem__ (self, idx):
-		reader = imageio.get_reader(self.dir + '/' + self.files[idx])
-		arr = []
-		for im in reader:
-			arr.append(im)
-			# arr.append(np.swapaxes(im,0,2))
-			# arr.append(np.array(im))
+		folder = self.folders[idx]
+		X = self.read_images(folder)
+		y = torch.LongTensor([classes.index(folder[:2])])
 
-		sample = {'video': torch.stack(arr, dim=0), 'label': classes.index(self.files[idx][:2])}
-		return sample
-
-class Net(nn.Module):
-	def __init__(self):
-		super(Net, self).__init__()
-		self.conv1 = nn.Conv2d(3, 6, 5)
-		self.pool = nn.MaxPool2d(2, 2)
-		self.conv2 = nn.Conv2d(6, 16, 5)
-		self.fc1 = nn.Linear(16 * 5 * 5, 120)
-		self.fc2 = nn.Linear(120, 84)
-		self.fc3 = nn.Linear(84, 10)
-
-	def forward(self, x_3d):
-		for t in range(x_3d.size(1)):
-			x = self.conv1(x_3d[:, t, :, :, :]) 
-			x = self.pool(F.relu(self.conv1(x)))
-			x = self.pool(F.relu(self.conv2(x)))
-			x = x.view(-1, 16 * 5 * 5)
-			x = F.relu(self.fc1(x))
-			x = F.relu(self.fc2(x))
-			x = self.fc3(x)
-		return x
+		return X,y
 
 if __name__ == '__main__':
 	num_epochs = 2
-	trainset = AGH_Dataset('data/small')
+	trainset = AGH_Dataset('data/smalljpg')
 	trainloader = torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
-	model = Net()
+	model = CNN()
 	with torch.no_grad():
-		for idx, m in enumerate(trainloader):
-			X = m['video']
-			y = m['label']
-			# print(X.size())
+		for batch_idx, (X, y) in enumerate(trainloader):
 			out = model(X)
 
 	# net = CNN()
