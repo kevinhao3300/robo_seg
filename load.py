@@ -19,6 +19,7 @@ def conv2D_output_size(img_size, padding, kernel_size, stride):
 	            np.floor((img_size[1] + 2 * padding[1] - (kernel_size[1] - 1) - 1) / stride[1] + 1).astype(int))
 	return outshape
 
+
 class CNN(nn.Module):
 	def __init__(self):
 		super(CNN, self).__init__()
@@ -78,9 +79,13 @@ class CNN(nn.Module):
 		for t in range(x_3d.size(1)):
 		    # CNNs
 		    x = self.conv1(x_3d[:, t, :, :, :])
+		    print('one')
 		    x = self.conv2(x)
+		    print('two')
 		    x = self.conv3(x)
+		    print('three')
 		    x = self.conv4(x)
+		    print('four')
 		    x = x.view(x.size(0), -1)           # flatten the output of conv
 
 		    # FC layers
@@ -108,23 +113,46 @@ class AGH_Dataset(Dataset):
 	def __getitem__ (self, idx):
 		reader = imageio.get_reader(self.dir + '/' + self.files[idx])
 		arr = []
-		for i, im in enumerate(reader):
-			arr.append(np.array(im))
+		for im in reader:
+			arr.append(im)
+			# arr.append(np.swapaxes(im,0,2))
+			# arr.append(np.array(im))
 
-		sample = {'video': np.array(arr), 'label': classes.index(self.files[idx][:2])}
+		sample = {'video': torch.stack(arr, dim=0), 'label': classes.index(self.files[idx][:2])}
 		return sample
 
+class Net(nn.Module):
+	def __init__(self):
+		super(Net, self).__init__()
+		self.conv1 = nn.Conv2d(3, 6, 5)
+		self.pool = nn.MaxPool2d(2, 2)
+		self.conv2 = nn.Conv2d(6, 16, 5)
+		self.fc1 = nn.Linear(16 * 5 * 5, 120)
+		self.fc2 = nn.Linear(120, 84)
+		self.fc3 = nn.Linear(84, 10)
+
+	def forward(self, x_3d):
+		for t in range(x_3d.size(1)):
+			x = self.conv1(x_3d[:, t, :, :, :]) 
+			x = self.pool(F.relu(self.conv1(x)))
+			x = self.pool(F.relu(self.conv2(x)))
+			x = x.view(-1, 16 * 5 * 5)
+			x = F.relu(self.fc1(x))
+			x = F.relu(self.fc2(x))
+			x = self.fc3(x)
+		return x
 
 if __name__ == '__main__':
 	num_epochs = 2
 	trainset = AGH_Dataset('data/small')
 	trainloader = torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
-	model = CNN()
+	model = Net()
 	with torch.no_grad():
 		for idx, m in enumerate(trainloader):
 			X = m['video']
 			y = m['label']
-			out = model.forward(X)
+			# print(X.size())
+			out = model(X)
 
 	# net = CNN()
 	# criterion = nn.CrossEntropyLoss()
