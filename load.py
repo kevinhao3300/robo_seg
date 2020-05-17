@@ -163,12 +163,12 @@ class AGH_Dataset(Dataset):
 
 		return X,y
 
-def train(cnn, lstm, train_loader, optimizer, criterion, epoch, device):
+def train(cnn, lstm, train_loader, optimizer, criterion, device):
 	cnn.train()
 	lstm.train()
 	losses = []
 	accs = []
-	for batch_idx, (X, y) in enumerate(trainloader):
+	for batch_idx, (X, y) in enumerate(train_loader):
 		X, y = X.to(device), y.to(device).view(-1, )
 		optimizer.zero_grad()
 		output = lstm(cnn((X)))
@@ -187,42 +187,80 @@ def train(cnn, lstm, train_loader, optimizer, criterion, epoch, device):
 
 	return losses, accs
 
+def test(cnn, lstm, test_loader, criterion, device):
+	cnn.eval()
+	lstm.eval()
+	losses = []
+	accs = []
+	with torch.no_grad():
+		for batch_idx, (X, y) in enumerate(test_loader):
+			X, y = X.to(device), y.to(device).view(-1, )
+			output = lstm(cnn((X)))
+			loss = criterion(output,y)
+			losses.append(loss.item())
+
+			y_pred = torch.max(output,1)[1]
+			acc = 0
+			for i in range(len(y_pred)):
+				if y_pred[i] == y[i]:
+					acc += 1
+			accs.append(acc/len(y_pred))
+
+	return np.mean(losses), np.mean(accs)
+
 if __name__ == '__main__':
-	print('starting')
-	start = time.time()
-	num_epochs = 100
-	trainset = AGH_Dataset('data/mediumjpg')
-	trainloader = torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
-	device = "cuda"
-	cnn = CNN().to(device)
-	lstm = RNN().to(device)
-	cnn = nn.DataParallel(cnn)
-	lstm = nn.DataParallel(lstm)
+	# print('starting')
+	# start = time.time()
+	# num_epochs = 100
+	# trainset = AGH_Dataset('data/mediumjpg')
+	# trainloader = torch.utils.data.DataLoader(trainset, batch_size=4, shuffle=True, num_workers=2)
+	# device = "cuda"
+	# cnn = CNN().to(device)
+	# lstm = RNN().to(device)
+	# cnn = nn.DataParallel(cnn)
+	# lstm = nn.DataParallel(lstm)
 
-	crnn_params = list(cnn.parameters()) + list(lstm.parameters())
-	optimizer = torch.optim.Adam(crnn_params, lr=1e-4)
-	criterion = nn.CrossEntropyLoss()
-	epoch_train_losses = []
-	accuracies = []
-	# epoch_test_losses = []
-	for epoch in range(num_epochs):
-		train_losses, accs = train(cnn, lstm, trainloader, optimizer, criterion, epoch, device)
-		average_loss = 0
-		accuracy = 0
-		for loss in train_losses:
-			average_loss += loss
-		for acc in accs:
-			accuracy += acc
-		accuracy /= len(accs)
-		average_loss /= len(train_losses)
-		epoch_train_losses.append(average_loss)
-		accuracies.append(accuracy)
+	# crnn_params = list(cnn.parameters()) + list(lstm.parameters())
+	# optimizer = torch.optim.Adam(crnn_params, lr=1e-4)
+	# criterion = nn.CrossEntropyLoss()
+	# epoch_train_losses = []
+	# accuracies = []
+	# # epoch_test_losses = []
+	# for epoch in range(num_epochs):
+	# 	train_losses, accs = train(cnn, lstm, trainloader, optimizer, criterion, device)
+	# 	average_loss = 0
+	# 	accuracy = 0
+	# 	for loss in train_losses:
+	# 		average_loss += loss
+	# 	for acc in accs:
+	# 		accuracy += acc
+	# 	accuracy /= len(accs)
+	# 	average_loss /= len(train_losses)
+	# 	epoch_train_losses.append(average_loss)
+	# 	accuracies.append(accuracy)
 
-		print(epoch, average_loss, accuracy)
+	# 	print(epoch, average_loss, accuracy)
 
-	print(f'done training after {time.time() - start} seconds')
+	# print(f'done training after {time.time() - start} seconds')
+	# np.save('loss', epoch_train_losses)
+	# np.save('acc', accuracies)
+	# torch.save(cnn,'cnn.pt')
+	# torch.save(lstm,'lstm.pt')
 
 	#5 epoch, no gpu - 375.50982117652893 seconds
 	#5 epoch, gpu -  122.61604070663452 seconds
-	
+	print('starting')
+	start = time.time()
+	device = "cuda"
+	criterion = nn.CrossEntropyLoss()
+	testset = AGH_Dataset('data/mediumjpg')
+	testloader = torch.utils.data.DataLoader(testset, batch_size=4, shuffle=True, num_workers=2)
+	cnn = torch.load('cnn.pt')
+	lstm = torch.load('lstm.pt')
+	losses, accs = test(cnn,lstm,testloader,criterion,device)
+	print(losses, accs)
+	np.save('losstest',losses)
+	np.save('acctest',accs)
+	print(f'done testing after {time.time() - start} seconds')
 
+#   4.863739013671875e-07 1.0    smalljpg
